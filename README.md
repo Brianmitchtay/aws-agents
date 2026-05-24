@@ -1,6 +1,6 @@
-# REDACTED Threat Intelligence — Multi-Agent Pipeline
+# Threat Intelligence — Multi-Agent Pipeline
 
-Hackathon prototype for **Problem 7: Automated Threat Intelligence**. Ingests threat feeds, classifies by asset category, routes to specialist AI agents, and notifies the right REDACTED team member.
+Hackathon prototype:: Ingests threat feeds, classifies by asset category, routes to specialist AI agents, and notifies the right team member.
 
 Built on AWS with **Amazon Bedrock** (Claude via Converse API), Lambda, SQS, DynamoDB, S3, SNS, and API Gateway — deployed with **AWS CDK**.
 
@@ -38,11 +38,11 @@ For a hackathon prototype, **Bedrock Converse API** gets you the same Claude mod
 
 ## Quick start
 
-### 1. Customize config for REDACTED
+### 1. Customize config for client
 
 Edit `config/asset_categories.json`:
 
-- Replace placeholder asset categories with REDACTED' real taxonomy
+- Replace placeholder asset categories with client's real taxonomy
 - Set `notify_email` for each category (SNS will send confirmation links on first deploy)
 - Adjust `severity_levels` if they use a different scale
 
@@ -90,7 +90,7 @@ The sample set in `scripts/samples/` includes:
 | `05_corporate_exchange_ntlm.json` | Corporate IT |
 | `06_telco_juniper_junos.json` | Telco |
 
-**Dedup behaviour today:** hash is `title + CVEs + source`. Exact resubmits of `01` return `"status": "duplicate"`. Samples `02` and `03` share CVE-2024-12345 but **different sources**, so they are ingested separately — useful for demoing a real-world dedup gap to REDACTED.
+**Dedup behaviour today:** hash is `title + CVEs + source`. Exact resubmits of `01` return `"status": "duplicate"`. Samples `02` and `03` share CVE-2024-12345 but **different sources**, so they are ingested separately — useful for demoing a real-world dedup gap.
 
 ### 4. Mark as processed (feedback loop)
 
@@ -100,7 +100,7 @@ curl -X POST "https://xxxx.execute-api.ap-southeast-2.amazonaws.com/prod/threats
   -d '{"feedback": "accurate", "notes": "Already patched in our environment"}'
 ```
 
-Feedback values are free-form strings for the demo — align with whatever REDACTED prefers.
+Feedback values are free-form strings for the demo — align with whatever Client prefers.
 
 ## API contract
 
@@ -141,7 +141,7 @@ infrastructure/                   # AWS CDK (TypeScript)
 scripts/                          # Sample threat + submit helper
 ```
 
-## Open questions for REDACTED
+## Open questions for clients
 
 Confirm these early — they affect config, not code structure:
 
