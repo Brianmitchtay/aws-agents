@@ -1,0 +1,30 @@
+{
+  "bedrock_model_id": "au.anthropic.claude-sonnet-4-6",
+  "severity_levels": ["critical", "high", "medium", "low", "informational"],
+  "asset_categories": [
+    {
+      "id": "scada_ot",
+      "display_name": "SCADA / OT Systems",
+      "description": "Industrial control systems, RTUs, substation automation, field devices",
+      "notify_email": "briantechstudy+scada@gmail.com"
+    },
+    {
+      "id": "network",
+      "display_name": "Network Infrastructure",
+      "description": "Routers, switches, firewalls, VPN, WAN/LAN",
+      "notify_email": "briantechstudy+network@gmail.com"
+    },
+    {
+      "id": "corporate_it",
+      "display_name": "Corporate IT",
+      "description": "Endpoints, identity, email, business applications",
+      "notify_email": "briantechstudy+it@gmail.com"
+    },
+    {
+      "id": "telco",
+      "display_name": "Telco / Communications",
+      "description": "Microwave, fibre, radio, telecoms infrastructure",
+      "notify_email": "briantechstudy+telco@gmail.com"
+    }
+  ]
+}

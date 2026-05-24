@@ -1,0 +1,5 @@
+{
+  "title": "Schneider Electric security notification: Modicon M340/M580 firmware update (CVE-2024-12345)",
+  "source": "schneider-advisories",
+  "content": "Schneider Electric has published a security bulletin for a critical buffer overflow in Modicon M340 and M580 programmable logic controllers. Firmware versions before 3.40 are affected. An unauthenticated attacker on the network could execute arbitrary code on the PLC. Customers running substation RTU and SCADA integrations should apply firmware 3.40 or later and restrict engineering workstation access to OT VLANs. Reference: CVE-2024-12345."
+}

@@ -1,0 +1,5 @@
+{
+  "title": "Active exploitation reported against Modicon PLCs used in energy sector",
+  "source": "industrial-cyber-daily",
+  "content": "Threat researchers report in-the-wild exploitation of a remote code execution flaw in Schneider Modicon M340/M580 controllers (tracked as CVE-2024-12345). Affected firmware builds predate version 3.40. Utilities and transmission operators with legacy substation automation should verify asset inventories and segment OT networks from corporate IT. Patch guidance is available from the vendor and CISA KEV catalog."
+}

@@ -1,0 +1,5 @@
+{
+  "title": "Juniper Junos OS SRX and EX out-of-bounds write (CVE-2024-21591)",
+  "source": "juniper-sirt",
+  "content": "Juniper Networks has disclosed CVE-2024-21591, an out-of-bounds write in the J-Web component of Junos OS on SRX Series firewalls and EX Series switches. Successful exploitation may lead to denial of service or remote code execution on devices exposed to the internet. Telco and microwave backhaul teams using Juniper for customer CPE aggregation should upgrade to the fixed Junos releases and limit J-Web to management networks only."
+}

@@ -1,0 +1,5 @@
+{
+  "title": "Critical vulnerability in Schneider Electric Modicon PLCs (CVE-2024-12345)",
+  "source": "cisa-kev",
+  "content": "A buffer overflow vulnerability has been disclosed in Schneider Electric Modicon M340 and M580 PLCs affecting firmware versions prior to 3.40. Successful exploitation could allow remote code execution on affected devices. CISA has added this to its Known Exploited Vulnerabilities catalog. Organizations operating substation automation and SCADA environments should prioritize patching or network segmentation. CVE-2024-12345."
+}

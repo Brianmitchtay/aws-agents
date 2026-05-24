@@ -1,0 +1,5 @@
+{
+  "title": "Cisco IOS XE zero-day with active exploitation (CVE-2024-20399)",
+  "source": "cisco-psirt",
+  "content": "Cisco has confirmed active exploitation of a privilege escalation vulnerability in IOS XE Software when the web UI feature is enabled. Unauthenticated remote attackers can create a local user with privilege level 15. Affected devices include enterprise routers and WAN edge appliances used for site connectivity. Disable the web UI on internet-facing devices and apply the fixed release immediately. CVE-2024-20399."
+}

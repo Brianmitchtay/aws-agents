@@ -1,0 +1,13 @@
+node_modules/
+cdk.out/
+*.js
+*.d.ts
+!jest.config.js
+__pycache__/
+*.pyc
+.env
+.env.*
+.DS_Store
+*.egg-info/
+dist/
+.venv/
