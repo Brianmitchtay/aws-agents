@@ -1,5 +1,20 @@
 {
-  "title": "Microsoft Exchange NTLM relay elevation of privilege (CVE-2024-21410)",
-  "source": "msrc-advisory",
-  "content": "Microsoft has released guidance for CVE-2024-21410, an elevation of privilege in Exchange Server that could allow an attacker to relay NTLM credentials against the Outlook Web App endpoint. Affected versions include Exchange Server 2016 and 2019 used for corporate email. Apply the March cumulative update and enable Extended Protection for Authentication on OWA and ECP virtual directories."
+  "type": "vulnerability",
+  "spec_version": "2.1",
+  "id": "vulnerability--c3d4e5f6-0005-0005-0005-000000000005",
+  "created": "2025-05-25T04:00:00.000Z",
+  "modified": "2025-05-25T04:00:00.000Z",
+  "name": "Microsoft Exchange Server NTLM relay vulnerability (CVE-2024-21410)",
+  "description": "A critical NTLM relay vulnerability in Microsoft Exchange Server allows an attacker to relay NTLM credentials and authenticate as the victim user. Affected versions include Exchange Server 2016 and 2019 without the February 2024 cumulative update. Microsoft has released patches and recommends enabling Extended Protection for Authentication (EPA). Corporate email infrastructure is at risk.",
+  "external_references": [
+    {
+      "source_name": "cve",
+      "external_id": "CVE-2024-21410",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-21410"
+    },
+    {
+      "source_name": "microsoft",
+      "url": "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2024-21410"
+    }
+  ]
 }

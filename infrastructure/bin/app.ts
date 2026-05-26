@@ -7,7 +7,7 @@ const app = new cdk.App();
 new ThreatIntelStack(app, "ThreatIntelStack", {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION ?? "ap-southeast-2",
+    region: process.env.CDK_DEFAULT_REGION ?? "us-east-1",
   },
-  description: "REDACTED threat intelligence multi-agent pipeline (hackathon prototype)",
+  description: "TAS Networks threat intelligence multi-agent pipeline (hackathon prototype)",
 });

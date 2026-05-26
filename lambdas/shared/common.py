@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 CVE_PATTERN = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
+_STIX_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]*--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def normalize_text(value: str) -> str:
@@ -24,6 +25,55 @@ def build_dedup_hash(title: str, body: str, source: str) -> str:
     """Stable hash for deduplication across overlapping feeds."""
     cves = "|".join(extract_cve_ids(f"{title}\n{body}"))
     normalized = normalize_text(f"{title}|{cves}|{source}")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def validate_stix_core(obj: dict[str, Any]) -> None:
+    """Validate required STIX 2.1 core fields. Raises ValueError on failure."""
+    for field in ("type", "spec_version", "id", "created", "modified"):
+        if field not in obj:
+            raise ValueError(f"Missing required STIX field: {field}")
+    if obj["spec_version"] != "2.1":
+        raise ValueError(f"Expected spec_version '2.1', got '{obj['spec_version']}'")
+    if not _STIX_ID_PATTERN.match(obj["id"]):
+        raise ValueError(f"Invalid STIX id format: {obj['id']}")
+    obj_type = obj["id"].split("--")[0]
+    if obj_type != obj["type"]:
+        raise ValueError(f"STIX id type '{obj_type}' does not match type field '{obj['type']}'")
+
+
+def extract_cves_from_stix(obj: dict[str, Any]) -> list[str]:
+    """Extract CVE IDs from a STIX object (external_references, pattern, description)."""
+    cves: set[str] = set()
+    # Primary: external_references with source_name == "cve"
+    for ref in obj.get("external_references", []):
+        if ref.get("source_name", "").lower() == "cve":
+            ext_id = ref.get("external_id", "")
+            if CVE_PATTERN.match(ext_id):
+                cves.add(ext_id.upper())
+    # Fallback: regex scan of pattern (indicator) and description
+    for text_field in ("pattern", "description", "name"):
+        cves.update(extract_cve_ids(obj.get(text_field, "")))
+    return sorted(cves)
+
+
+def build_stix_dedup_hash(obj: dict[str, Any]) -> str:
+    """Stable dedup hash for a STIX object, keyed on CVEs + STIX UUID."""
+    cves = extract_cves_from_stix(obj)
+    stix_uuid = obj["id"].split("--")[1]
+    # Use the STIX UUID as the "source" component so different objects with
+    # the same CVEs produce different hashes (CVE-only match is handled separately).
+    cve_str = "|".join(cves)
+    normalized = normalize_text(f"{cve_str}|{stix_uuid}")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def build_cve_cluster_hash(obj: dict[str, Any]) -> str:
+    """Hash keyed only on CVEs (no STIX id) — used for cross-object update detection."""
+    cves = extract_cves_from_stix(obj)
+    if not cves:
+        return ""
+    normalized = normalize_text("|".join(cves))
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
@@ -53,42 +103,3 @@ def to_decimal(value: float | int) -> Decimal:
     return Decimal(str(value))
 
 
-def invoke_bedrock_json(client: Any, model_id: str, system_prompt: str, user_message: str) -> dict[str, Any]:
-    response = client.converse(
-        modelId=model_id,
-        system=[{"text": system_prompt}],
-        messages=[{"role": "user", "content": [{"text": user_message}]}],
-        inferenceConfig={"maxTokens": 1024, "temperature": 0.2},
-    )
-    output_text = response["output"]["message"]["content"][0]["text"]
-    return parse_bedrock_json(output_text)
-
-
-def load_prompt_template(name: str) -> str:
-    prompts_dir = os.environ.get("PROMPTS_DIR", "/var/task/prompts")
-    path = os.path.join(prompts_dir, name)
-    with open(path, encoding="utf-8") as f:
-        return f.read()
-
-
-def build_classifier_prompt(config: dict[str, Any]) -> str:
-    template = load_prompt_template("classifier.md")
-    categories_block = "\n".join(
-        f"- **{c['id']}** ({c['display_name']}): {c['description']}"
-        for c in config["asset_categories"]
-    )
-    return template.replace("{{ASSET_CATEGORIES}}", categories_block)
-
-
-def build_specialist_prompt(config: dict[str, Any], category_id: str) -> str:
-    category = get_category(config, category_id)
-    if not category:
-        raise ValueError(f"Unknown category: {category_id}")
-
-    template = load_prompt_template("specialist.md")
-    severity_block = ", ".join(config.get("severity_levels", []))
-    return (
-        template.replace("{{CATEGORY_DISPLAY_NAME}}", category["display_name"])
-        .replace("{{CATEGORY_DESCRIPTION}}", category["description"])
-        .replace("{{SEVERITY_LEVELS}}", severity_block)
-    )

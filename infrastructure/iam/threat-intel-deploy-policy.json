@@ -50,8 +50,8 @@
         "iam:UntagRole"
       ],
       "Resource": [
-        "arn:aws:iam::234308273815:role/ThreatIntelStack*",
-        "arn:aws:iam::234308273815:role/cdk-*"
+        "arn:aws:iam::507111042393:role/ThreatIntelStack*",
+        "arn:aws:iam::507111042393:role/cdk-*"
       ]
     },
     {
@@ -100,7 +100,7 @@
         "lambda:PublishVersion",
         "lambda:ListVersionsByFunction"
       ],
-      "Resource": "arn:aws:lambda:ap-southeast-2:234308273815:function:ThreatIntelStack-*"
+      "Resource": "arn:aws:lambda:us-east-1:507111042393:function:ThreatIntelStack-*"
     },
     {
       "Sid": "DynamoDB",
@@ -114,7 +114,7 @@
         "dynamodb:UntagResource",
         "dynamodb:ListTagsOfResource"
       ],
-      "Resource": "arn:aws:dynamodb:ap-southeast-2:234308273815:table/ThreatIntelStack-*"
+      "Resource": "arn:aws:dynamodb:us-east-1:507111042393:table/ThreatIntelStack-*"
     },
     {
       "Sid": "SQS",
@@ -129,7 +129,7 @@
         "sqs:UntagQueue",
         "sqs:ListQueueTags"
       ],
-      "Resource": "arn:aws:sqs:ap-southeast-2:234308273815:ThreatIntelStack-*"
+      "Resource": "arn:aws:sqs:us-east-1:507111042393:ThreatIntelStack-*"
     },
     {
       "Sid": "SNS",
@@ -145,13 +145,13 @@
         "sns:UntagResource",
         "sns:ListTagsForResource"
       ],
-      "Resource": "arn:aws:sns:ap-southeast-2:234308273815:ThreatIntelStack-*"
+      "Resource": "arn:aws:sns:us-east-1:507111042393:ThreatIntelStack-*"
     },
     {
       "Sid": "APIGateway",
       "Effect": "Allow",
       "Action": "apigateway:*",
-      "Resource": "arn:aws:apigateway:ap-southeast-2::/*"
+      "Resource": "arn:aws:apigateway:us-east-1::/*"
     },
     {
       "Sid": "Logs",
@@ -165,7 +165,31 @@
         "logs:UntagResource",
         "logs:DeleteRetentionPolicy"
       ],
-      "Resource": "arn:aws:logs:ap-southeast-2:234308273815:log-group:/aws/lambda/ThreatIntelStack-*"
+      "Resource": "arn:aws:logs:us-east-1:507111042393:log-group:/aws/lambda/ThreatIntelStack-*"
+    },
+    {
+      "Sid": "BedrockAgents",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:CreateAgent",
+        "bedrock:UpdateAgent",
+        "bedrock:DeleteAgent",
+        "bedrock:GetAgent",
+        "bedrock:PrepareAgent",
+        "bedrock:CreateAgentAlias",
+        "bedrock:UpdateAgentAlias",
+        "bedrock:DeleteAgentAlias",
+        "bedrock:GetAgentAlias",
+        "bedrock:CreateAgentActionGroup",
+        "bedrock:UpdateAgentActionGroup",
+        "bedrock:DeleteAgentActionGroup",
+        "bedrock:TagResource",
+        "bedrock:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:us-east-1:507111042393:agent/*",
+        "arn:aws:bedrock:us-east-1:507111042393:agent-alias/*"
+      ]
     }
   ]
 }

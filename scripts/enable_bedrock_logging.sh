@@ -6,7 +6,7 @@
 #
 set -euo pipefail
 
-REGION="${AWS_DEFAULT_REGION:-ap-southeast-2}"
+REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 LOG_GROUP="/aws/bedrock/modelinvocations"
 ROLE_NAME="threat-intelligence-invocations"

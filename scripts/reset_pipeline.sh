@@ -4,12 +4,12 @@
 # Usage:
 #   ./scripts/reset_pipeline.sh
 #   AWS_PROFILE=root ./scripts/reset_pipeline.sh
-#   STACK_NAME=ThreatIntelStack AWS_DEFAULT_REGION=ap-southeast-2 ./scripts/reset_pipeline.sh
+#   STACK_NAME=ThreatIntelStack AWS_DEFAULT_REGION=us-east-1 ./scripts/reset_pipeline.sh
 #
 set -euo pipefail
 
 STACK_NAME="${STACK_NAME:-ThreatIntelStack}"
-REGION="${AWS_DEFAULT_REGION:-ap-southeast-2}"
+REGION="${AWS_DEFAULT_REGION:-us-east-1}"
 
 echo "Resetting pipeline for stack ${STACK_NAME} in ${REGION}..."
 

@@ -38,7 +38,11 @@ Use this to guide classification when vendor/product names appear in the threat:
 
 ## Asset categories
 
-{{ASSET_CATEGORIES}}
+- **apps_engineering** (Apps & Engineering): SAP (S/4HANA, SuccessFactors), Microsoft 365, Salesforce, ServiceNow, GitLab, Snowflake, Splunk, Trellix XDR, Cortex XSOAR, and other internal or client-facing business applications
+- **infrastructure** (Infrastructure): Non-SCADA physical infrastructure: datacenters, servers, storage, virtualisation, physical security systems
+- **network_operations** (Network Operations Center): Network devices and monitoring: Palo Alto NGFW/Prisma, Cisco Catalyst switches and WAN edge routers, ESRI mapping/GIS systems, network management platforms
+- **scada** (SCADA): Physical hardware and remote management for operational technology: industrial control systems, PLCs, RTUs, substation automation, field devices, OT networks
+- **service_desk** (Service Desk): Fallback category for threats that do not clearly match any other team. General IT support, unclassified endpoints, or ambiguous advisories.
 
 ## Classification guidance
 

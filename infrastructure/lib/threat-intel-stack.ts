@@ -3,6 +3,7 @@ import * as path from "path";
 import { execSync } from "child_process";
 import * as cdk from "aws-cdk-lib";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -30,6 +31,11 @@ interface PipelineConfig {
 function loadConfig(): PipelineConfig {
   const configPath = path.join(__dirname, "../../config/asset_categories.json");
   return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+}
+
+function loadPrompt(filename: string): string {
+  const promptPath = path.join(__dirname, "../../prompts", filename);
+  return fs.readFileSync(promptPath, "utf-8");
 }
 
 function bundleLambdaAsset(outputDir: string): void {
@@ -74,26 +80,14 @@ function createLambdaCode(): lambda.Code {
   });
 }
 
-function bedrockPolicyResources(region: string, account: string, modelId: string): string[] {
-  // Geo/global inference profiles (e.g. au.anthropic.claude-sonnet-4-6) route to
-  // foundation models in multiple regions — wildcard the region on foundation-model.
-  if (/^(au|us|eu|global)\./.test(modelId)) {
-    const foundationModelId = modelId.replace(/^(au|us|eu|global)\./, "");
-    return [
-      `arn:aws:bedrock:${region}:${account}:inference-profile/${modelId}`,
-      `arn:aws:bedrock:*::foundation-model/${foundationModelId}`,
-    ];
-  }
-  return [`arn:aws:bedrock:${region}::foundation-model/${modelId}`];
-}
-
 export class ThreatIntelStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const config = loadConfig();
-    const configJson = JSON.stringify(config);
     const lambdaCode = createLambdaCode();
+
+    // --- Storage ---
 
     const rawBucket = new s3.Bucket(this, "RawThreatIntel", {
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -115,19 +109,22 @@ export class ThreatIntelStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    threatsTable.addGlobalSecondaryIndex({
+      indexName: "stix-id-index",
+      partitionKey: { name: "stix_id", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // --- Queues ---
+
     const ingestionQueue = new sqs.Queue(this, "IngestionQueue", {
       visibilityTimeout: cdk.Duration.minutes(5),
     });
 
-    const specialistQueues: Record<string, sqs.Queue> = {};
-    for (const category of config.asset_categories) {
-      specialistQueues[category.id] = new sqs.Queue(this, `SpecialistQueue-${category.id}`, {
-        visibilityTimeout: cdk.Duration.minutes(5),
-      });
-    }
+    // --- Notifications ---
 
     const notificationTopic = new sns.Topic(this, "ThreatNotifications", {
-      displayName: "REDACTED Threat Intel Notifications",
+      displayName: "TasNetworks Threat Intel Notifications",
     });
 
     const uniqueEmails = [...new Set(config.asset_categories.map((c) => c.notify_email))];
@@ -135,13 +132,75 @@ export class ThreatIntelStack extends cdk.Stack {
       notificationTopic.addSubscription(new snsSubscriptions.EmailSubscription(email));
     }
 
-    const bedrockPolicy = new iam.PolicyStatement({
-      actions: ["bedrock:InvokeModel", "bedrock:Converse"],
-      resources: bedrockPolicyResources(this.region, this.account, config.bedrock_model_id),
+    // --- Bedrock Agent IAM Role ---
+
+    const agentRole = new iam.Role(this, "BedrockAgentRole", {
+      assumedBy: new iam.ServicePrincipal("bedrock.amazonaws.com"),
+      description: "Role assumed by Bedrock Agents for the threat intel pipeline",
     });
 
-    const createLambdaLogGroup = (id: string) =>
-      new logs.LogGroup(this, `${id}LogGroup`, {
+    const modelId = config.bedrock_model_id;
+    const isInferenceProfile = /^(us|eu|global)\./.test(modelId);
+    const modelResources: string[] = isInferenceProfile
+      ? [
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${modelId}`,
+          `arn:aws:bedrock:*::foundation-model/${modelId.replace(/^(us|eu|global)\./, "")}`,
+        ]
+      : [`arn:aws:bedrock:${this.region}::foundation-model/${modelId}`];
+
+    agentRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel"],
+        resources: modelResources,
+      })
+    );
+
+    // --- Bedrock Agents ---
+
+    const classifierInstruction = loadPrompt("classifier_agent.md");
+
+    const classifierAgent = new bedrock.CfnAgent(this, "ClassifierAgent", {
+      agentName: "ThreatIntelClassifier",
+      description: "Classifies STIX 2.1 threat intelligence into asset categories",
+      foundationModel: config.bedrock_model_id,
+      instruction: classifierInstruction,
+      agentResourceRoleArn: agentRole.roleArn,
+      idleSessionTtlInSeconds: 600,
+      autoPrepare: true,
+    });
+
+    const classifierAlias = new bedrock.CfnAgentAlias(this, "ClassifierAgentAlias", {
+      agentId: classifierAgent.attrAgentId,
+      agentAliasName: "live",
+    });
+
+    const specialistAgents: Record<string, { agent: bedrock.CfnAgent; alias: bedrock.CfnAgentAlias }> = {};
+
+    for (const category of config.asset_categories) {
+      const instruction = loadPrompt(`specialist_${category.id}.md`);
+
+      const agent = new bedrock.CfnAgent(this, `SpecialistAgent-${category.id}`, {
+        agentName: `ThreatIntelSpecialist-${category.id}`,
+        description: `Specialist analyst for ${category.display_name} threats`,
+        foundationModel: config.bedrock_model_id,
+        instruction: instruction,
+        agentResourceRoleArn: agentRole.roleArn,
+        idleSessionTtlInSeconds: 600,
+        autoPrepare: true,
+      });
+
+      const alias = new bedrock.CfnAgentAlias(this, `SpecialistAgentAlias-${category.id}`, {
+        agentId: agent.attrAgentId,
+        agentAliasName: "live",
+      });
+
+      specialistAgents[category.id] = { agent, alias };
+    }
+
+    // --- Lambda Functions ---
+
+    const createLambdaLogGroup = (logId: string) =>
+      new logs.LogGroup(this, `${logId}LogGroup`, {
         retention: logs.RetentionDays.ONE_WEEK,
         removalPolicy: cdk.RemovalPolicy.DESTROY,
       });
@@ -149,7 +208,7 @@ export class ThreatIntelStack extends cdk.Stack {
     const lambdaDefaults: Partial<lambda.FunctionProps> = {
       runtime: lambda.Runtime.PYTHON_3_12,
       code: lambdaCode,
-      timeout: cdk.Duration.minutes(2),
+      timeout: cdk.Duration.minutes(3),
       memorySize: 512,
     };
 
@@ -164,37 +223,53 @@ export class ThreatIntelStack extends cdk.Stack {
       },
     } as lambda.FunctionProps);
 
-    const classifierFn = new lambda.Function(this, "ClassifierFn", {
-      ...lambdaDefaults,
-      logGroup: createLambdaLogGroup("ClassifierFn"),
-      handler: "classifier.handler.handler",
-      environment: {
-        TABLE_NAME: threatsTable.tableName,
-        SPECIALIST_QUEUE_URLS: JSON.stringify(
-          Object.fromEntries(
-            config.asset_categories.map((c) => [c.id, specialistQueues[c.id].queueUrl])
-          )
-        ),
-        BEDROCK_MODEL_ID: config.bedrock_model_id,
-        ASSET_CATEGORIES_JSON: configJson,
-        PROMPTS_DIR: "/var/task/prompts",
-      },
-    } as lambda.FunctionProps);
-    classifierFn.addToRolePolicy(bedrockPolicy);
+    // Build specialist agent alias ARN map for the orchestrator
+    const specialistAliasArns: Record<string, string> = {};
+    for (const category of config.asset_categories) {
+      const { alias } = specialistAgents[category.id];
+      specialistAliasArns[category.id] = `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/${specialistAgents[category.id].agent.attrAgentId}/${alias.attrAgentAliasId}`;
+    }
 
-    const specialistFn = new lambda.Function(this, "SpecialistFn", {
+    const orchestratorFn = new lambda.Function(this, "OrchestratorFn", {
       ...lambdaDefaults,
-      logGroup: createLambdaLogGroup("SpecialistFn"),
-      handler: "specialist.handler.handler",
+      logGroup: createLambdaLogGroup("OrchestratorFn"),
+      handler: "orchestrator.handler.handler",
+      timeout: cdk.Duration.minutes(5),
       environment: {
         TABLE_NAME: threatsTable.tableName,
         NOTIFICATION_TOPIC_ARN: notificationTopic.topicArn,
-        BEDROCK_MODEL_ID: config.bedrock_model_id,
-        ASSET_CATEGORIES_JSON: configJson,
-        PROMPTS_DIR: "/var/task/prompts",
+        CLASSIFIER_AGENT_ID: classifierAgent.attrAgentId,
+        CLASSIFIER_AGENT_ALIAS_ID: classifierAlias.attrAgentAliasId,
+        SPECIALIST_AGENT_IDS: JSON.stringify(
+          Object.fromEntries(
+            config.asset_categories.map((c) => [
+              c.id,
+              specialistAgents[c.id].agent.attrAgentId,
+            ])
+          )
+        ),
+        SPECIALIST_AGENT_ALIAS_IDS: JSON.stringify(
+          Object.fromEntries(
+            config.asset_categories.map((c) => [
+              c.id,
+              specialistAgents[c.id].alias.attrAgentAliasId,
+            ])
+          )
+        ),
+        ASSET_CATEGORIES_JSON: JSON.stringify(config),
+        WEBHOOK_URL: process.env.WEBHOOK_URL ?? "https://th-0fbaf552e7a542398039f841c2dec7d4.ecs.us-east-1.on.aws",
       },
     } as lambda.FunctionProps);
-    specialistFn.addToRolePolicy(bedrockPolicy);
+
+    orchestratorFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeAgent"],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
+          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
+        ],
+      })
+    );
 
     const markProcessedFn = new lambda.Function(this, "MarkProcessedFn", {
       ...lambdaDefaults,
@@ -205,29 +280,23 @@ export class ThreatIntelStack extends cdk.Stack {
       },
     } as lambda.FunctionProps);
 
+    // --- Permissions ---
+
     rawBucket.grantReadWrite(ingestFn);
     threatsTable.grantReadWriteData(ingestFn);
-    threatsTable.grantReadWriteData(classifierFn);
-    threatsTable.grantReadWriteData(specialistFn);
+    threatsTable.grantReadWriteData(orchestratorFn);
     threatsTable.grantReadWriteData(markProcessedFn);
     ingestionQueue.grantSendMessages(ingestFn);
-    ingestionQueue.grantConsumeMessages(classifierFn);
+    ingestionQueue.grantConsumeMessages(orchestratorFn);
+    notificationTopic.grantPublish(orchestratorFn);
 
-    for (const category of config.asset_categories) {
-      specialistQueues[category.id].grantSendMessages(classifierFn);
-      specialistQueues[category.id].grantConsumeMessages(specialistFn);
-    }
-    notificationTopic.grantPublish(specialistFn);
+    // --- Event Sources ---
 
-    classifierFn.addEventSource(
+    orchestratorFn.addEventSource(
       new lambdaEventSources.SqsEventSource(ingestionQueue, { batchSize: 1 })
     );
 
-    for (const category of config.asset_categories) {
-      specialistFn.addEventSource(
-        new lambdaEventSources.SqsEventSource(specialistQueues[category.id], { batchSize: 1 })
-      );
-    }
+    // --- API Gateway ---
 
     const api = new apigateway.RestApi(this, "ThreatIntelApi", {
       restApiName: "Threat Intel Ingestion API",
@@ -242,6 +311,8 @@ export class ThreatIntelStack extends cdk.Stack {
     threatById
       .addResource("processed")
       .addMethod("POST", new apigateway.LambdaIntegration(markProcessedFn));
+
+    // --- Outputs ---
 
     new cdk.CfnOutput(this, "IngestUrl", {
       value: `${api.url}threats`,
@@ -261,5 +332,17 @@ export class ThreatIntelStack extends cdk.Stack {
     new cdk.CfnOutput(this, "ThreatsTableName", {
       value: threatsTable.tableName,
     });
+
+    new cdk.CfnOutput(this, "ClassifierAgentId", {
+      value: classifierAgent.attrAgentId,
+      description: "Bedrock Agent ID for the classifier",
+    });
+
+    for (const category of config.asset_categories) {
+      new cdk.CfnOutput(this, `SpecialistAgentId-${category.id}`, {
+        value: specialistAgents[category.id].agent.attrAgentId,
+        description: `Bedrock Agent ID for ${category.display_name} specialist`,
+      });
+    }
   }
 }
