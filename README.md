@@ -1,8 +1,12 @@
 # Threat Intelligence — Multi-Agent Pipeline
 
-Hackathon prototype:: Ingests threat feeds, classifies by asset category, routes to specialist AI agents, and notifies the right team member.
+2026 TasNetworks/AWS/UTAS Hackathon Winner
 
-Built on AWS with **Amazon Bedrock** (Claude via Converse API), Lambda, SQS, DynamoDB, S3, SNS, and API Gateway — deployed with **AWS CDK**.
+This prototype ingests threat feeds, classifies by asset category, routes to specialist AI agents, and notifies the right team member (via an API query to an AWS-hosted mock-front-end)
+
+Built on AWS with **Amazon Bedrock**, Lambda, SQS, DynamoDB, S3, SNS, and API Gateway — deployed with **AWS CDK**.
+
+[!multi_agent_AWS_ai_architecture.diagram.png](./multi_agent_AWS_ai_architecture.drawio.png)
 
 ## Architecture
 
@@ -81,14 +85,14 @@ Submit one sample or the full demo set:
 
 The sample set in `scripts/samples/` includes:
 
-| File | Intent |
-|------|--------|
-| `01_scada_plc_cisa.json` | SCADA/OT baseline (Schneider PLC) |
+| File                                | Intent                                                |
+| ----------------------------------- | ----------------------------------------------------- |
+| `01_scada_plc_cisa.json`            | SCADA/OT baseline (Schneider PLC)                     |
 | `02_scada_plc_vendor_advisory.json` | Same CVE, vendor bulletin — different source/phrasing |
-| `03_scada_plc_industry_news.json` | Same CVE, news-style write-up |
-| `04_network_cisco_iosxe.json` | Network routing |
-| `05_corporate_exchange_ntlm.json` | Corporate IT |
-| `06_telco_juniper_junos.json` | Telco |
+| `03_scada_plc_industry_news.json`   | Same CVE, news-style write-up                         |
+| `04_network_cisco_iosxe.json`       | Network routing                                       |
+| `05_corporate_exchange_ntlm.json`   | Corporate IT                                          |
+| `06_telco_juniper_junos.json`       | Telco                                                 |
 
 **Dedup behaviour today:** hash is `title + CVEs + source`. Exact resubmits of `01` return `"status": "duplicate"`. Samples `02` and `03` share CVE-2024-12345 but **different sources**, so they are ingested separately — useful for demoing a real-world dedup gap.
 
@@ -145,14 +149,14 @@ scripts/                          # Sample threat + submit helper
 
 Confirm these early — they affect config, not code structure:
 
-| Topic | Question |
-|-------|----------|
-| **Asset taxonomy** | What are your real asset categories? (SCADA/OT, substation, corporate, telco, etc.) |
-| **Severity scale** | Do you use CVSS, a internal 1–5 scale, or Critical/High/Medium/Low? |
-| **Feed ingestion** | Push webhooks, polled RSS/API, email, PDF uploads? Who provides credentials? |
-| **Notification channel** | Email (SNS, wired now), Microsoft Teams webhook, SMS, ServiceNow ticket? |
-| **Routing matrix** | Which person/role owns each asset category? |
-| **Dedup rules** | Is CVE-only dedup enough, or do you dedup on vendor advisory ID too? |
+| Topic                    | Question                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| **Asset taxonomy**       | What are your real asset categories? (SCADA/OT, substation, corporate, telco, etc.) |
+| **Severity scale**       | Do you use CVSS, a internal 1–5 scale, or Critical/High/Medium/Low?                 |
+| **Feed ingestion**       | Push webhooks, polled RSS/API, email, PDF uploads? Who provides credentials?        |
+| **Notification channel** | Email (SNS, wired now), Microsoft Teams webhook, SMS, ServiceNow ticket?            |
+| **Routing matrix**       | Which person/role owns each asset category?                                         |
+| **Dedup rules**          | Is CVE-only dedup enough, or do you dedup on vendor advisory ID too?                |
 
 ## Demo tips
 
