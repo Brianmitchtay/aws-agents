@@ -8,6 +8,8 @@ Built on AWS with **Amazon Bedrock**, Lambda, SQS, DynamoDB, S3, SNS, and API Ga
 
 [!multi_agent_AWS_ai_architecture.diagram.png](./multi_agent_AWS_ai_architecture.drawio.png)
 
+This whole project was coded using Claude Opus 4.6 on Claude Code, so take care if you fork it or use it, take care to review it well and ensure it meets your requirements.
+
 ## Architecture
 
 ```
@@ -17,24 +19,22 @@ Threat Feed (webhook / manual POST)
         ↓
   SQS (ingestion queue)
         ↓
-  Lambda (classifier)  →  Bedrock (classifier prompt)
+  Lambda (Agent Orchestrator function)
+        ↓
+  Bedrock Agent (classifier)
         ↓
   SQS (per asset-category queue)
         ↓
-  Lambda (specialist)  →  Bedrock (specialist prompt)
+  Bedrock Agent (specialist x5)
         ↓
   DynamoDB (assessment)  →  SNS (email digest)
         ↓
   API Gateway  →  Lambda (mark processed + feedback)
 ```
 
-### Why Bedrock Converse instead of Bedrock Agents?
-
-For a hackathon prototype, **Bedrock Converse API** gets you the same Claude models with far less setup — no agent aliases, action groups, or orchestration config to debug. The prompt files in `prompts/` are structured so you can migrate each "agent" to a **Bedrock Agent** later if you want native tool use and multi-step reasoning.
-
 ## Prerequisites
 
-1. **AWS account** with Amazon Bedrock in `ap-southeast-2` (Sydney) — Claude Sonnet 4.6 is available without a separate model access request
+1. **AWS account** with Amazon Bedrock (Our workshop account was set up in `us-east-1`)
 2. **AWS CLI v2** configured (`aws configure`)
 3. **Node.js 18+** and **npm**
 4. **Docker Desktop** (optional — CDK can bundle Python Lambdas locally without it)
@@ -72,8 +72,15 @@ Note the stack outputs:
 Reset pipeline state (needed after a failed run or to clear demo data):
 
 ```bash
-chmod +x scripts/reset_pipeline.sh scripts/submit_samples.sh
-AWS_PROFILE=root ./scripts/reset_pipeline.sh   # needs read/delete on DynamoDB/S3/SQS
+chmod +x scripts/reset_pipeline.sh scripts/reset_db.sh scripts/submit_samples.sh
+AWS_PROFILE=root ./scripts/reset_pipeline.sh   # wipes DynamoDB, S3 raw/, and purges SQS queues
+```
+
+Reset and re-seed the DynamoDB table from the mock-frontend seed data (useful for demo retakes):
+
+```bash
+./scripts/reset_db.sh                          # clears table then seeds from mock-frontend/seed-dynamodb.js
+STACK_NAME=ThreatIntelStack ./scripts/reset_db.sh
 ```
 
 Submit one sample or the full demo set:
@@ -83,16 +90,12 @@ Submit one sample or the full demo set:
 ./scripts/submit_samples.sh "https://xxxx.execute-api.ap-southeast-2.amazonaws.com/prod/threats"
 ```
 
-The sample set in `scripts/samples/` includes:
+Run the curated demo batch (sends two waves of threats with a delay for live presentations):
 
-| File                                | Intent                                                |
-| ----------------------------------- | ----------------------------------------------------- |
-| `01_scada_plc_cisa.json`            | SCADA/OT baseline (Schneider PLC)                     |
-| `02_scada_plc_vendor_advisory.json` | Same CVE, vendor bulletin — different source/phrasing |
-| `03_scada_plc_industry_news.json`   | Same CVE, news-style write-up                         |
-| `04_network_cisco_iosxe.json`       | Network routing                                       |
-| `05_corporate_exchange_ntlm.json`   | Corporate IT                                          |
-| `06_telco_juniper_junos.json`       | Telco                                                 |
+````bash
+python3 scripts/demo_batch.py                         # uses default deployed URL
+python3 scripts/demo_batch.py --url <ingest-url> --delay 3
+```                                              |
 
 **Dedup behaviour today:** hash is `title + CVEs + source`. Exact resubmits of `01` return `"status": "duplicate"`. Samples `02` and `03` share CVE-2024-12345 but **different sources**, so they are ingested separately — useful for demoing a real-world dedup gap.
 
@@ -102,7 +105,7 @@ The sample set in `scripts/samples/` includes:
 curl -X POST "https://xxxx.execute-api.ap-southeast-2.amazonaws.com/prod/threats/{threat_id}/processed" \
   -H "Content-Type: application/json" \
   -d '{"feedback": "accurate", "notes": "Already patched in our environment"}'
-```
+````
 
 Feedback values are free-form strings for the demo — align with whatever Client prefers.
 
@@ -133,7 +136,7 @@ Response `200` (duplicate): `{ "status": "duplicate", "threat_id": "..." }`
 ## Project layout
 
 ```
-config/asset_categories.json   # Taxonomy + routing (edit this first)
+config/asset_categories.json      # Taxonomy + routing (edit this first)
 prompts/                          # Bedrock system prompts (classifier + specialist)
 lambdas/
   ingest/                         # API → S3 + dedup + SQS
@@ -142,7 +145,15 @@ lambdas/
   mark_processed/                 # Feedback loop
   shared/common.py                # Dedup, Bedrock helpers
 infrastructure/                   # AWS CDK (TypeScript)
-scripts/                          # Sample threat + submit helper
+scripts/
+  demo_batch.py                   # Curated two-wave demo (live presentation)
+  reset_db.sh                     # Clear + re-seed DynamoDB from mock-frontend seed data
+  reset_pipeline.sh               # Wipe all pipeline state (DynamoDB, S3, SQS)
+  submit_sample.sh                # Submit a single threat to the ingest API
+  submit_samples.sh               # Submit all samples/ threats
+  enable_bedrock_logging.sh       # Configure Bedrock → CloudWatch invocation logging
+  grant-deploy-access.sh          # Attach deploy IAM policy to a user
+  samples/                        # Sample threat JSON files
 ```
 
 ## Open questions for clients
