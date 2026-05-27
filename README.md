@@ -6,7 +6,7 @@ This prototype ingests threat feeds, classifies by asset category, routes to spe
 
 Built on AWS with **Amazon Bedrock**, Lambda, SQS, DynamoDB, S3, SNS, and API Gateway — deployed with **AWS CDK**.
 
-[!multi_agent_AWS_ai_architecture.diagram.png](./multi_agent_AWS_ai_architecture.drawio.png)
+![multi_agent_AWS_ai_architecture.diagram.png](./multi_agent_AWS_ai_architecture.drawio.png)
 
 This whole project was coded using Claude Opus 4.6 on Claude Code, so take care if you fork it or use it, take care to review it well and ensure it meets your requirements.
 
